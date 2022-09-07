@@ -8,15 +8,14 @@ class HashMap:
         self._item_count = 0
 
     @property
-    def _is_full(self):
+    def _is_full(self) -> bool:
         return self._item_count == self._array_size - 1
 
-    def _hash(self, key, count_collisions=0):
-        key_bytes = key.encode()
-        hash_code = sum(key_bytes)
-        return (hash_code + count_collisions) % self._array_size
+    def _hash(self, key: str) -> int:
+        # Very basic - would need a better hasher for large maps
+        return sum(key.encode()) % self._array_size
 
-    def _get_index_and_entry_for(self, key):
+    def _get_index_and_entry_for(self, key: str):
         index = self._hash(key)
         array_entry = self._array[index]
         loop_count = 0
@@ -44,7 +43,7 @@ class HashMap:
         for key, value in current_entries:
             self[key] = value
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value):
         if self._is_full:
             self._resize()
 
@@ -53,11 +52,11 @@ class HashMap:
             self._item_count += 1
         self._array[index] = [key, value]
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
         _, entry = self._get_index_and_entry_for(key)
         return None if entry is None else entry[1]
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str):
         index, entry = self._get_index_and_entry_for(key)
         if entry is not None:
             self._item_count -= 1
