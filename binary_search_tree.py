@@ -112,18 +112,25 @@ class BST:
         return BST.search(self.head, value) is not None
 
     def __repr__(self):
-        return f"<{BST.__name__}>: [{BST.print_nodes(self.head)[:-2]}]"
+        value_strs = [str(e) for e in self]
+        return f"<{BST.__name__}>: [{', '.join(value_strs)}]"
+    
+    def __iter__(self):
+         return iter(BST.get_values(self.head))
 
     # Static methods of class used for traversal
     @staticmethod
-    def print_nodes(node: Node, values=''):
-        new_values = ''
+    def get_values(node: Node, values=None):
+        if values == None:
+            values = []
+
         if node is None:
             return values
-        new_values += BST.print_nodes(node.left)
-        new_values += str(node.value) + ", "
-        new_values += BST.print_nodes(node.right)
-        return values + new_values
+
+        left_values = BST.get_values(node.left)
+        current_values = [node.value]
+        right_values = BST.get_values(node.right)
+        return values + left_values + current_values + right_values
 
     @staticmethod
     def insert_list(head, lst, count=0):
