@@ -14,14 +14,14 @@ class Direction(Enum):
 
 
 class Node:
-    def __init__(self, value) -> None:
+    def __init__(self, value=None) -> None:
         self.left: Node = None
         self.right: Node = None
         self.parent: Node = None
         self.value: int = value
 
     @property
-    def children_direction(self) -> Direction:
+    def children(self) -> Direction:
         if self.left is not None and self.right is not None:
             return Direction.BOTH
         elif self.right is not None:
@@ -44,17 +44,9 @@ class Node:
 
 
 class Successor(NamedTuple):
-    replacement_value: int
-    node_parent: Node
+    node: Node
+    direction: Direction
     count: int
-    direction: Direction
-
-
-class SearchResult(NamedTuple):
-    did_find_value: bool
-    parent_node: Node
-    value_node: Node
-    direction: Direction
 
 
 class BST:
@@ -62,15 +54,10 @@ class BST:
         self.head: Node = None
         self.size = 0
 
-        if isinstance(values, list):
+        if values and isinstance(values, list):
             values.sort()
-            values_length = len(values)
-            if values_length == 1:
-                self.head = Node(values.pop())
-                self.size = 1
-            elif values_length > 1:
-                self.head = Node(values.pop(values_length // 2))
-                self.size = BST.insert_list(self.head, values, 1)
+            for value in BST.insert_order(values):
+                self.insert(value)
 
     def insert(self, value) -> bool:
         node, did_insert = BST.insert_node(self.head, value)
@@ -85,25 +72,29 @@ class BST:
         if self.head is None:
             return False
 
-        search: SearchResult = BST._parent_and_node_of_value(self.head, value)
-        if not search.did_find_value:
+        searched_node: Node = BST.search(self.head, value)
+        search_direction = searched_node.children
+        if not searched_node:
             return False
-
-        search_direction = search.value_node.children_direction
-        if search_direction is Direction.NONE:
-            setattr(search.parent_node, search.direction.value, None)
+        elif search_direction is Direction.NONE:
+            if searched_node.parent is None:
+                self.head = None
+            else:
+                if searched_node.parent.left is searched_node:
+                    searched_node.parent.left = None
+                else:
+                    searched_node.parent.right = None
         else:
             successor: Successor = None
             if search_direction is not Direction.BOTH:
-                successor = BST._successor(search.value_node, search_direction)
+                successor = BST._successor(searched_node, search_direction)
             else:
-                left = BST._successor(search.value_node, Direction.LEFT)
-                right = BST._successor(search.value_node, Direction.RIGHT)
+                left = BST._successor(searched_node, Direction.LEFT)
+                right = BST._successor(searched_node, Direction.RIGHT)
                 successor = left if left.count >= right.count else right
 
-            search.value_node.value = successor.replacement_value
-            setattr(successor.node_parent,
-                    successor.direction.value, None)
+            searched_node.value = successor.node.value
+            setattr(successor.node.parent, successor.direction.value, None)
         self.size -= 1
         return True
 
@@ -120,8 +111,7 @@ class BST:
     def __iter__(self):
         return BST.yield_values(self.head)
 
-    # Static methods of class used for traversal
-
+    # Static methods of class
     @staticmethod
     def yield_values(node: Node):
         if node is None:
@@ -138,65 +128,48 @@ class BST:
                 yield value
 
     @staticmethod
-    def insert_list(head, lst, count=0):
-        if len(lst) < 3:
-            for value in lst:
-                _, did_insert = BST.insert_node(head, value)
-                if did_insert:
-                    count += 1
+    def insert_node(head: Node, value, parent: Node = None):
+        did_insert = True
+        if head is None:
+            head = Node(value)
+            head.parent = parent
+        elif head.value > value:
+            head.left, did_insert = BST.insert_node(head.left, value, head)
+        elif head.value < value:
+            head.right, did_insert = BST.insert_node(head.right, value, head)
         else:
-            mid_index = len(lst) // 2
-            new_head, did_insert = BST.insert_node(head, lst[mid_index])
-            if did_insert:
-                count += 1
-            count += BST.insert_list(new_head, lst[0: mid_index])
-            count += BST.insert_list(new_head, lst[mid_index + 1:])
-        return count
+            did_insert = False
+        return head, did_insert
 
     @staticmethod
-    def _parent_and_node_of_value(node: Node, value) -> SearchResult:
-        if node is None:
-            return SearchResult(False, None, None, None)
-        elif node.value == value:
-            return SearchResult(True, node, node, node.children_direction)
-        else:
-            is_left = node.left is not None and node.left.value == value
-            is_right = node.right is not None and node.right.value == value
-            if is_left or is_right:
-                direction = Direction.LEFT if is_left else Direction.RIGHT
-                value_node = getattr(node, direction.value)
-                return SearchResult(True, node, value_node, direction)
-            elif node.value > value:
-                return BST._parent_and_node_of_value(node.left, value)
-            else:
-                return BST._parent_and_node_of_value(node.right, value)
+    def insert_order(lst):
+        mid_index = len(lst) // 2
+        yield lst[mid_index]
+        if left := lst[0: mid_index]:
+            for value in BST.insert_order(left):
+                yield value
+        if right := lst[mid_index + 1:]:
+            for value in BST.insert_order(right):
+                yield value
 
     @staticmethod
     def _successor(node: Node, direction: Direction):
-        # initial step in direction
-        prior_node = node
-        successor_node = prior_node.get_child(direction)
-
+        prior = node
+        node = node.get_child(direction)
         # now reverse as want min/max value for branch
         direction = direction.opposite()
         count = 0
-        found_value = None
 
-        while successor_node is not None:
-            next_node = successor_node.get_child(direction)
-            if next_node is None:
-                found_value = successor_node.value
-                break
-            else:
-                count += 1
-                prior_node = successor_node
-                successor_node = next_node
+        while node is not None:
+            count += 1
+            prior = node
+            node = node.get_child(direction)
 
         # reverse back if never went down a level
         if count == 0:
             direction = direction.opposite()
 
-        return Successor(found_value, prior_node, count, direction)
+        return Successor(prior, direction, count)
 
     @staticmethod
     def search(node: Node, value) -> Node:
@@ -209,24 +182,13 @@ class BST:
         else:
             return BST.search(node.right, value)
 
-    @staticmethod
-    def insert_node(node: Node, value):
-        did_insert = True
-        if node is None:
-            node = Node(value)
-        elif node.value > value:
-            node.left, did_insert = BST.insert_node(node.left, value)
-        elif node.value < value:
-            node.right, did_insert = BST.insert_node(node.right, value)
-        else:
-            did_insert = False
-        return (node, did_insert)
-
 
 @time_function
 def main():
-    values = [5, 8, 10, 54, 90, 4, 8, 1, 3, 12, 9, 17, 45, 80, 34, 27, 4]
+    values = [5, 8, 10, 54, 90, 4, 8, 1, 3, 12, 9, 17, 45, 80, 34, 27]
+
     print(f"{values = }")
+    print(f"{len(values) = }")
     tree = BST(values)
     print(f"{tree = }")
     print(f"{2 not in tree = }")
@@ -237,6 +199,7 @@ def main():
     print(f"{len(tree) = }")
     print(f"{tree.delete(45) = }")
     print(f"{len(tree) = }")
+    print(f"{tree = }")
 
 
 if __name__ == "__main__":
