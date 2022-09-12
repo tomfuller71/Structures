@@ -1,5 +1,6 @@
 from typing import NamedTuple
 from enum import Enum
+from utils import time_function
 
 
 class Direction(Enum):
@@ -16,6 +17,7 @@ class Node:
     def __init__(self, value) -> None:
         self.left: Node = None
         self.right: Node = None
+        self.parent: Node = None
         self.value: int = value
 
     @property
@@ -112,25 +114,28 @@ class BST:
         return BST.search(self.head, value) is not None
 
     def __repr__(self):
-        value_strs = [str(e) for e in self]
+        value_strs = (str(e) for e in self)
         return f"<{BST.__name__}>: [{', '.join(value_strs)}]"
-    
+
     def __iter__(self):
-         return iter(BST.get_values(self.head))
+        return BST.yield_values(self.head)
 
     # Static methods of class used for traversal
+
     @staticmethod
-    def get_values(node: Node, values=None):
-        if values == None:
-            values = []
-
+    def yield_values(node: Node):
         if node is None:
-            return values
+            return
 
-        left_values = BST.get_values(node.left)
-        current_values = [node.value]
-        right_values = BST.get_values(node.right)
-        return values + left_values + current_values + right_values
+        if node.left:
+            for value in BST.yield_values(node.left):
+                yield value
+
+        yield node.value
+
+        if node.right:
+            for value in BST.yield_values(node.right):
+                yield value
 
     @staticmethod
     def insert_list(head, lst, count=0):
@@ -205,26 +210,27 @@ class BST:
             return BST.search(node.right, value)
 
     @staticmethod
-    def insert_node(head: Node, value):
+    def insert_node(node: Node, value):
         did_insert = True
-        if head is None:
-            head = Node(value)
-        elif head.value > value:
-            head.left, _ = BST.insert_node(head.left, value)
-        elif head.value < value:
-            head.right, _ = BST.insert_node(head.right, value)
+        if node is None:
+            node = Node(value)
+        elif node.value > value:
+            node.left, did_insert = BST.insert_node(node.left, value)
+        elif node.value < value:
+            node.right, did_insert = BST.insert_node(node.right, value)
         else:
             did_insert = False
-        return (head, did_insert)
+        return (node, did_insert)
 
 
+@time_function
 def main():
     values = [5, 8, 10, 54, 90, 4, 8, 1, 3, 12, 9, 17, 45, 80, 34, 27, 4]
     print(f"{values = }")
     tree = BST(values)
     print(f"{tree = }")
-    print(f"{2 in tree = }")
-    print(f"{20 in tree = }")
+    print(f"{2 not in tree = }")
+    print(f"{80 in tree = }")
     print(f"{len(tree) = }")
     print(f"{tree.insert(99) = }")
     print(f"{tree = }")
